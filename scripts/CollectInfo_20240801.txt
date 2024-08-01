@@ -1,0 +1,337 @@
+
+######################################################################################################33
+
+#!/bin/bash
+#
+# Memory leak detection - collect information 
+#
+# Script Date    : 2024-07-25
+
+HOST=`hostname -s`
+DATE=`date "+%Y-%m-%d_%T" | tr ":" "_"`
+OUTPUT_FILE_PATH="/var/log/${HOST}_memory_${DATE}.txt"
+
+
+echo "[Expert@$HOST]# date"                                                                > $OUTPUT_FILE_PATH
+date                                                                                      >> $OUTPUT_FILE_PATH
+echo                                                                                      >> $OUTPUT_FILE_PATH
+
+echo "[Expert@$HOST]# uptime"                                                             >> $OUTPUT_FILE_PATH
+uptime                                                                                    >> $OUTPUT_FILE_PATH
+echo                                                                                      >> $OUTPUT_FILE_PATH
+
+echo "[Expert@$HOST]# free -k"                                                            >> $OUTPUT_FILE_PATH
+free -k                                                                                   >> $OUTPUT_FILE_PATH
+echo                                                                                      >> $OUTPUT_FILE_PATH
+
+echo "[Expert@$HOST]# cpstat os -f memory"                                                >> $OUTPUT_FILE_PATH
+cpstat os -f memory                                                                       >> $OUTPUT_FILE_PATH
+
+echo "[Expert@$HOST]# fw ctl pstat"                                                       >> $OUTPUT_FILE_PATH 
+fw ctl pstat                                                                              >> $OUTPUT_FILE_PATH 
+
+echo "[Expert@$HOST]# cat /proc/meminfo"                                                  >> $OUTPUT_FILE_PATH 
+cat /proc/meminfo                                                                         >> $OUTPUT_FILE_PATH
+echo                                                                                      >> $OUTPUT_FILE_PATH
+
+echo "[Expert@$HOST]# ps aux | sort -nk6 | grep yara | wc -l"                             >> $OUTPUT_FILE_PATH  
+ps aux | sort -nk6 | grep yara | wc -l                                                    >> $OUTPUT_FILE_PATH
+echo                                                                                      >> $OUTPUT_FILE_PATH
+
+echo "[Expert@$HOST]# ps aux | awk '{print $11}' | sort | uniq -c | sort -n | tail -n 5"  >> $OUTPUT_FILE_PATH  
+ps aux | awk '{print $11}' | sort | uniq -c | sort -n | tail -n 5                         >> $OUTPUT_FILE_PATH
+echo                                                                                      >> $OUTPUT_FILE_PATH
+
+echo "[Expert@$HOST]# ps aux --sort -rss  | head -n 20"                                   >> $OUTPUT_FILE_PATH
+ps aux --sort -rss  | head -n 20                                                          >> $OUTPUT_FILE_PATH
+echo                                                                                      >> $OUTPUT_FILE_PATH
+
+echo "[Expert@$HOST]# top -o %MEM -b -n 1 | head -n 20"                                   >> $OUTPUT_FILE_PATH
+top -o %MEM -b -n 1 | head -n 20                                                          >> $OUTPUT_FILE_PATH
+echo                                                                                      >> $OUTPUT_FILE_PATH
+
+
+echo "-------------------------------------------------------------------"
+echo "File : cat $OUTPUT_FILE_PATH                                       "
+echo "-------------------------------------------------------------------"
+
+
+######################################################################################################33
+#!/bin/bash
+#
+
+ScriptDate=2023-04-19
+ScriptVersion=01.03
+
+# -------------------------------------------------------------------------------------------------
+# Script key folders and files variable configuration
+# -------------------------------------------------------------------------------------------------
+
+MY_DATE=`date '+%Y%m%d'`
+MY_HOSTNAME=`hostname -s`
+MY_IP=$(/sbin/ip -o -4 addr list eth0 | awk '{print $4}' | cut -d/ -f1)
+
+
+# Path where temporary information and files are stored
+MY_PATH="/var/tmp/"
+
+
+# Names of 3 files exported to SCP serv
+MY_BACKUP_FILENAME="${MY_HOSTNAME}_${MY_DATE}_BACKUP.tgz"
+MY_COLLECT_FILENAME="${MY_HOSTNAME}_${MY_DATE}_COLLECTINFO.txt"
+MY_CPINFO_FILENAME="${MY_HOSTNAME}_${MY_DATE}_CPINFO"
+MY_FILENAME_WILDCARD="${MY_HOSTNAME}_${MY_DATE}_"
+
+
+# The System Backup command needs 'lock database override' to run
+echo -n '[+] Unlock gaia database : '
+clish -i -c "lock database override"
+sleep 5
+
+
+MY_DATE=`date '+%F %H:%M:%S'`
+
+echo -e "\n"
+echo "-------------------------------"
+echo "DATE     : $MY_DATE"
+echo "HOSTNAME : $MY_HOSTNAME"
+echo "IP       : $MY_IP"
+echo "-------------------------------"
+
+
+### [3] Collect basic system and firewall information ##########################################
+echo -e "\n[3] Collecting Checkpoint and System Information ..."
+
+
+MY_DATE=`date '+%F_%H:%M:%S'`
+
+echo "-----------------------------------------"   >   $MY_COLLECT_FILENAME
+echo "DATE        : ${MY_DATE}"                    >>  $MY_COLLECT_FILENAME
+echo "HOSTNAME    : ${MY_HOSTNAME}"                >>  $MY_COLLECT_FILENAME
+echo "IP ADDRESS  : ${MY_IP}"                      >>  $MY_COLLECT_FILENAME
+echo "-----------------------------------------"   >>  $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- show clock -------------------------------------------------------" >> $MY_COLLECT_FILENAME
+clish -c "show clock"                                                         >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- show hostname ----------------------------------------------------" >> $MY_COLLECT_FILENAME
+clish -c "show hostname"                                                      >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- uptime -----------------------------------------------------------" >> $MY_COLLECT_FILENAME
+uptime                                                                        >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- uptime -s --------------------------------------------------------" >> $MY_COLLECT_FILENAME
+uptime -s                                                                     >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- show version all -------------------------------------------------" >> $MY_COLLECT_FILENAME
+clish -c "show version all"                                                   >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- show asset all ---------------------------------------------------" >> $MY_COLLECT_FILENAME
+clish -c "show asset all"                                                     >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- cpstat os --------------------------------------------------------" >> $MY_COLLECT_FILENAME
+cpstat os -f all                                                              >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- JumboHotFix Take -------------------------------------------------" >> $MY_COLLECT_FILENAME
+cpinfo -y all 2>&1 | grep  JUMBO  | uniq                                      >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- cplic print -x  --------------------------------------------------" >> $MY_COLLECT_FILENAME
+cplic print -x                                                                >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- cpstat os -f licensing  ------------------------------------------" >> $MY_COLLECT_FILENAME
+cpstat os -f licensing                                                        >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- cat $CPDIR/conf/cp.license  --------------------------------------" >> $MY_COLLECT_FILENAME
+cat $CPDIR/conf/cp.license                                                    >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- Blades: enabled_blades--------------------------------------------" >> $MY_COLLECT_FILENAME
+enabled_blades                                                                >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- fw stat ----------------------------------------------------------" >> $MY_COLLECT_FILENAME
+fw stat                                                                       >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- ips stat ---------------------------------------------------------" >> $MY_COLLECT_FILENAME
+ips stat                                                                      >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- ClusterXL: cphaprob state ----------------------------------------" >> $MY_COLLECT_FILENAME
+cphaprob state                                                                >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- ClusterXL: cphaprob -a if ----------------------------------------" >> $MY_COLLECT_FILENAME
+cphaprob -a if                                                                >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- ClusterXL: cphaprob syncstat -------------------------------------" >> $MY_COLLECT_FILENAME
+cphaprob syncstat                                                             >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- ClusterXL: cphaprob show_failover --------------------------------" >> $MY_COLLECT_FILENAME
+cphaprob show_failover                                                        >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- ClusterXL: cpstat ha -f all --------------------------------------" >> $MY_COLLECT_FILENAME
+cpstat ha -f all                                                              >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- Backup: /var/log/CPbackup/backup_logs.elg ------------------------" >> $MY_COLLECT_FILENAME
+grep TRUE /var/log/CPbackup/backup_logs.elg | tail -n 3                       >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- Disk space: df -hT -----------------------------------------------" >> $MY_COLLECT_FILENAME
+df -hT                                                                        >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- LVM Overview -----------------------------------------------------" >> $MY_COLLECT_FILENAME
+clish -c "show system lvm overview"                                           >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- Disk space: parted -l --------------------------------------------" >> $MY_COLLECT_FILENAME
+parted -l                                                                     >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- Network Routing: netstat -rnv ------------------------------------" >> $MY_COLLECT_FILENAME
+netstat -rnv                                                                  >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- Interface State: Ethtool -----------------------------------------" >> $MY_COLLECT_FILENAME
+NIC=`/sbin/ifconfig -a | egrep -B 2 "UP BROADCAST" | grep HWaddr | cut -d' ' -f1`
+for i in $NIC ; do LINK=`ethtool $i | grep Link | cut -f2`;echo "ethtool $i -- $LINK"; done >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- Network Interface Status: netstat -ni  ---------------------------" >> $MY_COLLECT_FILENAME
+netstat -ni                                                                   >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- Network Interface Status: cpstat os -f ifconfig  -----------------" >> $MY_COLLECT_FILENAME
+cpstat os -f ifconfig                                                         >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- cat $FWDIR/boot/boot.conf ----------------------------------------" >> $MY_COLLECT_FILENAME
+cat $FWDIR/boot/boot.conf                                                     >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- cat /etc/fw.boot/ha_boot.conf ------------------------------------" >> $MY_COLLECT_FILENAME
+cat /etc/fw.boot/ha_boot.conf                                                 >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- fw ctl get int fwlic_num_of_allowed_cores ------------------------" >> $MY_COLLECT_FILENAME
+fw ctl get int fwlic_num_of_allowed_cores                                     >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- fw ctl affinity -l -r --------------------------------------------" >> $MY_COLLECT_FILENAME
+fw ctl affinity -l -r                                                         >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- cat $FWDIR/conf/fwaffinity.conf  ---------------------------------" >> $MY_COLLECT_FILENAME
+cat $FWDIR/conf/fwaffinity.conf                                               >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- fw ctl multik dynamic_dispatching get_mode  ----------------------" >> $MY_COLLECT_FILENAME
+fw ctl multik dynamic_dispatching get_mode                                    >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- show installer status --------------------------------------------" >> $MY_COLLECT_FILENAME
+clish -c "show installer status"                                              >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                >> $MY_COLLECT_FILENAME
+echo "--- last | head -n 15 ------------------------------------------------" >> $MY_COLLECT_FILENAME
+last | head -n 15                                                             >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------" >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                                            >> $MY_COLLECT_FILENAME
+echo "--- Detect Hotfix Installation date ----------------------------------"                             >> $MY_COLLECT_FILENAME
+cat /opt/CPInstLog/DeploymentAgent.log | grep MSG_INSTALL_SUCCEEDED | grep -v DeploymentAgent | tail -n 1 >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------"                             >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                                            >> $MY_COLLECT_FILENAME
+echo "--- List local GAIA users --------------------------------------------"                             >> $MY_COLLECT_FILENAME
+clish -c "show users"                                                                                     >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------"                             >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                                            >> $MY_COLLECT_FILENAME
+echo "--- show configuration -----------------------------------------------"                             >> $MY_COLLECT_FILENAME
+clish -c "show configuration"                                                                             >> $MY_COLLECT_FILENAME
+echo "----------------------------------------------------------------------"                             >> $MY_COLLECT_FILENAME
+
+echo -e "\n\n"                                                                                            >> $MY_COLLECT_FILENAME
+echo "--- DONE -------------------------------------------------------------"                             >> $MY_COLLECT_FILENAME
+
+
+echo -e "\n[3] CollectInfo FILENAME : $MY_COLLECT_FILENAME"
+
+echo -e "\n##################################################################"
+
+
+
+echo -e "\n\n"   
+echo "----------------------------------------------------------------------"                           
+echo "--- HealthCheck Point (HCP)  -----------------------------------------"     
+echo "----------------------------------------------------------------------"                           
+echo -e "\n\n"  
+
+hcp -r all --include-wts yes --include-topology yes --include-charts yes   
+
+pid=$!
+
+# Waiting until process is Completed
+wait $pidA
+
+
+                    
+echo -e "\n\n" 
+echo -e "\n\n[+] DONE !"
+
+
+exit 0
