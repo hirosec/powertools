@@ -56,24 +56,19 @@ function Get-FileInfo {
 
 
 ##############################################################################################
+### MAIN
 
 Write-Host "`n[+] Date    : $(Get-Date -format s)"
 Write-Host "[+] URL     : $url"
 
 $user = $url.Split('/')[3]
 $repo = $url.Split('/')[4]
-
-			
 			
 $uri = "https://api.github.com/repos/$user/$repo/zipball/"
 
-$timestamp = Get-Date -format "yyyyMMddTHHmm"
-			
-			
 
 $response = Invoke-WebRequest -Method Get -Headers $headers -Uri $uri
 $filename = $response.headers['content-disposition'].Split('=')[1]
-			
 			
 Set-Content -Path "$filename" -Encoding byte -Value $response.Content 
 
