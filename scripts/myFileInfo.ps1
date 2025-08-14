@@ -3,13 +3,9 @@
 	
 	powershell -ep bypass -f myFileinfo.ps1 -Filepath c:\temp\tux.png
 	
-	
-	
-	powershell "iex (iwr http://192.168.137.1/myShare2025/myFileinfo.ps1 -UseBasicParsing);  Get-FileInfo -Filepath c:\temp\tux.png"
+	powershell "iex (iwr https://raw.githubusercontent.com/hirosec/powertools/refs/heads/main/scripts/myFileInfo.ps1 -UseBasicParsing);  Get-FileInfo -Filepath c:\temp\tux.png"
 
-
-	
-	
+	powershell "iex (iwr https://tinyurl.com/7ae2e35r -UseBasicParsing);  Get-FileInfo -Filepath c:\temp\tux.png"
 	
 #>
 param (
