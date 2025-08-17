@@ -1,4 +1,4 @@
-# 2025/08/14 - v1.00
+# LAST CHANGED: 2025/08/14 - v1.00
 
 function Get-First {
     [CmdletBinding()]
