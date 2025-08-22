@@ -1,0 +1,8 @@
+# 2025/08/15
+
+myFileInfo.ps1
+Get-GithubMaster.ps1
+whoamiNG.ps1
+Upload-HFSServer.ps1
+create-FileInfoRevision.ps1
+check-ScriptVersion.ps1
