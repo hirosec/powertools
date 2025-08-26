@@ -10,6 +10,13 @@
 	
 	URL:  https://time.is/
 
+if(!($UserData = $Env:LocalAppData)) {
+                    $UserData = [Environment]::GetFolderPath("LocalApplicationData")
+
+
+# Create a folder whether is exists or not
+New-Item -Path "$($env:LOCALAPPDATA)\$GITHUB_API_STORE" -ItemType Directory -Force
+
 #>
 
 
@@ -24,7 +31,8 @@ param (
 
 Add-Type -AssemblyName 'System.Security'
 
-$API_KEY_PATH = "GITHUB_API_Token_Protect.store"
+$GITHUB_API_STORE = "GithubApiStore"
+$API_TOKEN        = "TokenProtect.db"
 
 
 
@@ -120,16 +128,22 @@ Write-Host ""
 
 
 # If API token is provided, update local protected file store
-If (-Not ([string]::IsNullOrEmpty($token))) {
-	
-	$protectedKey = Protect-String -String $token 
-	Set-Content -Path $API_KEY_PATH -Value $protectedKey -Encoding UTF8
+$TokenStorePath = "$($env:LOCALAPPDATA)\$GITHUB_API_STORE"
+$TokenFile = Join-Path -Path $TokenStorePath -ChildPath $API_TOKEN
 
-	Write-Host "[+] Protected API token updated : $API_KEY_PATH"
+If (-Not ([string]::IsNullOrEmpty($token))) {
+	$protectedKey = Protect-String -String $token 
+
+	# Create a folder whether is exists or not
+	New-Item -Path $TokenStorePath -ItemType Directory -Force | Out-Null
+
+	Set-Content -Path $TokenFile  -Value $protectedKey -Encoding UTF8
+
+	Write-Host "[+] Protected API token updated : $TokenFile"
 } Else {
 	# Test to load saved API key from DPAPI Protected config file
-	If ((Test-Path -Path $API_KEY_PATH  -PathType leaf)) {
-		$ProtectedAPIToken = Get-Content -Path $API_KEY_PATH -Encoding UTF8
+	If ((Test-Path -Path $TokenFile  -PathType leaf)) {
+		$ProtectedAPIToken = Get-Content -Path $TokenFile -Encoding UTF8
 		$token = Unprotect-String -ProtectedString $ProtectedAPIToken
 	} Else {
 		Write-Host "[+] ERROR - missing Github API Token." -ForeGroundColor Red
@@ -161,6 +175,3 @@ Write-Host "[+] Hash                        : $( (Get-Filehash -Path $file -Algo
 git-uploadfile -token $token -file $file -owner $owner -repo $repo -path $repoPath -force | FL *
 
 Write-Host "[+] DONE !"
-
-
-
