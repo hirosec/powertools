@@ -10,13 +10,6 @@
 	
 	URL:  https://time.is/
 
-if(!($UserData = $Env:LocalAppData)) {
-                    $UserData = [Environment]::GetFolderPath("LocalApplicationData")
-
-
-# Create a folder whether is exists or not
-New-Item -Path "$($env:LOCALAPPDATA)\$GITHUB_API_STORE" -ItemType Directory -Force
-
 #>
 
 
