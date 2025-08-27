@@ -1,12 +1,12 @@
 <#
 
-	LAST CHANGED: 2025/08/26 - version 1.0
+	LAST CHANGED: 2025/08/27 - version 1.0
 
 	powershell -ep bypass -f Upload-Github.ps1 
 
 
 	# Update Protected API Token file
-	powershell -ep bypass -f Upload-Github.ps1 -token ghp_????????????????????????????????????	
+	powershell -ep bypass -f Upload-Github.ps1 -token <MY_API_TOKEN>	
 	
 	URL:  https://time.is/
 
@@ -25,14 +25,27 @@ param (
 	[string] $repo          = "powertools",
 	[string] $repoPath      = "lists",
 	[string] $token        	= $null,
-	[string] $fileName      = "time_20250826a.JPG",
-	[string] $filePath      = "."	
+	[string] $fileName      = "time_20250827.JPG",
+	[string] $filePath      = ".",
+	[switch] $Version
 )
 
 Add-Type -AssemblyName 'System.Security'
 
 $GITHUB_API_STORE = "GithubApiStore"
 $API_TOKEN        = "TokenProtect.db"
+
+
+
+$CurrentVersion = '1.0.0'
+$PublishedAt    = '2025-08-27'
+
+# Display version if -Version is specified
+if ($Version.IsPresent) {
+	Write-Host "Version         : $CurrentVersion"
+	Write-Host "Published at    : $PublishedAt"
+    exit 0
+}
 
 
 
@@ -156,7 +169,7 @@ Write-Host "[+] Owner                       : $owner"
 Write-Host "[+] Repo                        : $repo"
 Write-Host "[+] Repo Path                   : $repoPath"
 Write-Host ""
-Write-Host "[+] API Token                   : [$token]"
+Write-Host "[+] API Token                   : $token"
 Write-Host ""
 
 
