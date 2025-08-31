@@ -1,5 +1,5 @@
 <#
-	Last Changed: 2025-08-29  - v1.0
+	Last Changed: 2025-08-31  - v1.0
 	
 	powershell -ep bypass -f List-GithubRepo.ps1
 	
@@ -7,7 +7,6 @@
 
 #>
 param (
-
 	$owner   = "hirosec",
 	$repo    = "powertools",
 	$path    = "scripts",
@@ -25,7 +24,7 @@ $API_TOKEN        = "TokenProtect.db"
 
 
 $CurrentVersion = '1.0.0'
-$PublishedAt    = '2025-08-29'
+$PublishedAt    = '2025-08-31'
 
 
 # Display version if -Version is specified
@@ -75,6 +74,73 @@ Function Unprotect-String
 }
 
 
+
+# Format File Size
+Function Convert-Size {
+    [cmdletbinding()]
+    Param (
+        [parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [Alias("Length")]
+        [int64]$Size
+    )
+    Begin {
+        If (-Not $ConvertSize) {
+            $Signature =  @"
+                 [DllImport("Shlwapi.dll", CharSet = CharSet.Auto)]
+                 public static extern long StrFormatByteSize( long fileSize, System.Text.StringBuilder buffer, int bufferSize );
+"@
+            $Global:ConvertSize = Add-Type -Name SizeConverter -MemberDefinition $Signature -PassThru
+        }
+        $stringBuilder = New-Object Text.StringBuilder 1024
+    }
+    Process {
+        $ConvertSize::StrFormatByteSize( $Size, $stringBuilder, $stringBuilder.Capacity ) | Out-Null
+        $stringBuilder.ToString() + " ($($Size.ToString('N0')) bytes)"
+    }
+}
+
+
+Function Get-GithubFileinfo {
+	Param (
+		$owner,
+		$repo,
+		$path,
+		$name
+	)
+
+	$url = "https://raw.githubusercontent.com/$owner/$repo/refs/heads/main/$path/$name"
+	
+	Try {
+		$response = Invoke-WebRequest -Method Get -Uri $url 
+
+		If ($($response.Headers.'Content-Type') -like "*text*") {
+			$tmpData = $response.Content
+		} else {
+			Write-Host "ERROR - Wrong Content Type : $($response.Headers.'Content-Type')"
+		}
+
+				
+		$hasher = [System.Security.Cryptography.HashAlgorithm]::Create("MD5") 
+		$bytes = $hasher.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($tmpData))
+		$hash = [System.BitConverter]::ToString($bytes).Replace('-', '').ToUpperInvariant()
+		
+		$size = $tmpData.Length
+	} Catch {
+		Write-Host "   ERROR - Resource no found : $url" -ForegroundColor Red
+		[int]$StatusCode = $_.Exception.Response.StatusCode
+		# Write-Host "StatusCode  : $StatusCode"   -ForegroundColor Blue
+		return
+	}
+	
+	$myObject = [PSCustomObject]@{
+		Name     = $name
+		Size     = $($size | Convert-Size)
+		MD5      = $hash
+	}
+	
+	return $myObject
+}
+
 #############################################################################################################
 ### MAIN
 
@@ -118,8 +184,7 @@ Write-Host "[+] Repo                        : $repo"
 Write-Host "[+] Repo Path                   : $path"
 Write-Host ""
 Write-Host "[+] API Token                   : $token"
-Write-Host ""
-Write-Host "--------------------------------------------------------"
+Write-Host "-----------------------------------------------------------------------------------"
 
 # GitHub API URL
 $url = "https://api.github.com/repos/$owner/$repo/contents/$path"
@@ -134,12 +199,16 @@ $headers = @{
 # Make the API request
 $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
 
+
+$fileList = @()
+
 # Display file names
 $response | ForEach-Object {
     if ($_.type -eq "file") {
-        Write-Output $_.name
+        # Write-Host $_.name -ForeGroundColor Yellow
+		
+		$fileList += Get-GithubFileinfo -owner $owner -repo $repo -path $path -name $_.name
     }
 }
 
-
-############################################################
+$fileList
