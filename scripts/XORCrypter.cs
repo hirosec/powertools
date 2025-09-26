@@ -4,6 +4,9 @@
 // 2025/09/26
 // C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe -out:XORCrypter.exe XORCrypter.cs
 
+// USAGE:  XORCrypter.exe blob.exe 0x42
+
+
 using System;
 using System.IO;
 using System.Security.Cryptography;
@@ -32,11 +35,11 @@ class XORCrypter
 	
 	static void Main(string[] args)
 	{
-		byte encryptionKey = 0x12;
-
-		string XORkey = encryptionKey.ToString("x2");
-		
 		string filePath = args[0];
+		string hexInput = args[1];
+		
+		int decimalValue = Convert.ToInt32(hexInput, 16);
+		byte encryptionKey = (byte)decimalValue;
 		
 		if (!File.Exists(filePath))
         {
@@ -44,11 +47,10 @@ class XORCrypter
 			return;
 		}
 		
-		string md5Hash = CalculateMD5(filePath);
-				
+	
 		Console.WriteLine("Filename : " + filePath);
-		Console.WriteLine("MD5 hash : " + md5Hash);
-		Console.WriteLine("XOR Key  : 0x" + XORkey);
+		Console.WriteLine("MD5 hash : " + CalculateMD5(filePath));
+		Console.WriteLine("XOR Key  : 0x" + decimalValue.ToString("x2"));
 		
 		XORCrypter crypter = new XORCrypter(encryptionKey);
 
