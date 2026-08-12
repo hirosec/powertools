@@ -28,10 +28,10 @@ param (
 )
 
 
-$scriptVersion = "v1.0 - 2026/08/12"
-$updateScript  = "https://"
+$scriptVersion    = "v1.0 - 2026/08/12"
+$updateScriptURL  = "https://raw.githubusercontent.com/hirosec/powertools/refs/heads/main/scripts/check-EUVD.ps1"
 
-$api_URL = "https://euvdservices.enisa.europa.eu/api/search?size=100&page=NNNN&fromScore=7.6&toScore=10&fromDate=yyyy-MM-dd"
+$api_URL          = "https://euvdservices.enisa.europa.eu/api/search?size=100&page=NNNN&fromScore=7.6&toScore=10&fromDate=yyyy-MM-dd"
 
 
 $vendorList = @(
@@ -58,10 +58,29 @@ $vendorList = @(
 )
 	
 $pathArchive = "ENISA_Archive\"	
-	
-	
+		
 
 #########################################################################################################
+
+Function Check-LatestScriptVersion {
+
+	try {
+		$WebResponse = (Invoke-WebRequest $updateScriptURL -UseBasicParsing -Headers @{"Cache-Control"="no-cache"}).Content
+		
+
+		foreach ($line in $WebResponse -split "`n") {
+
+			If ($line -like "*scriptVersion*") {
+				$tempStr = [regex]::matches($line,'(?<=\").+?(?=\")').value
+				Write-Host "[+] Latest    : $tempStr" -ForeGroundColor Yellow
+				return $null
+			}
+		}	 
+	} catch {
+            Write-host "[ERROR] $($_.Exception)" -ForeGroundColor Red
+            return $null
+	}	
+}
 
 
 Function format-Date {
@@ -108,10 +127,8 @@ Write-Host "[+] Date      : $(Get-Date -format 'yyyy-MM-dd HH:mm')"
 Write-Host "[+] Version   : $scriptVersion"
 	
 If ($version) {
-
-	exit
+	Check-LatestScriptVersion
 }
-
 
 
 
