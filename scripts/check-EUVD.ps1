@@ -81,12 +81,15 @@ Function Check-LatestScriptVersion {
 	try {
 		$WebResponse = (Invoke-WebRequest $updateScriptURL -UseBasicParsing -Headers @{"Cache-Control"="no-cache"}).Content
 		
-
+		$bytes = [System.Text.Encoding]::UTF8.GetBytes($WebResponse)
+		$hash = [System.Security.Cryptography.MD5]::Create().ComputeHash($bytes)
+		$md5 = [BitConverter]::ToString($hash) -replace '-', ''
+ 
 		foreach ($line in $WebResponse -split "`n") {
 
 			If ($line -like "*scriptVersion*") {
 				$tempStr = [regex]::matches($line,'(?<=\").+?(?=\")').value
-				Write-Host "[+] Latest    : $tempStr" -ForeGroundColor Yellow
+				Write-Host "[+] Latest    : $tempStr - $md5" -ForeGroundColor Yellow
 				return $null
 			}
 		}	 
@@ -138,14 +141,15 @@ Function grep-CVE {
 ### MAIN
 
 Write-Host "[+] Date      : $(Get-Date -format 'yyyy-MM-dd HH:mm')"
-Write-Host "[+] Version   : $scriptVersion"
+Write-Host "[+] Version   : $scriptVersion - $((Get-FileHash $($MyInvocation.MyCommand.Name) -algo MD5).Hash)"
 	
 If ($version) {
 	Check-LatestScriptVersion
+	
 	exit
 }
 
-
+exit
 $pageBack = 2
 
 If (! [string]::IsNullOrEmpty($vendor)) {
