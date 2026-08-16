@@ -37,7 +37,7 @@ param (
 )
 
 
-$scriptVersion    = "v1.1 - 2026/08/16"
+$scriptVersion    = "v1.1 - 2026/08/16a"
 $updateScriptURL  = "https://raw.githubusercontent.com/hirosec/powertools/refs/heads/main/scripts/check-EUVD.ps1"
 
 $api_URL          = "https://euvdservices.enisa.europa.eu/api/search?size=100&page=NNNN&fromScore=7.6&toScore=10&fromDate=yyyy-MM-dd"
