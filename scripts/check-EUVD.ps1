@@ -149,7 +149,9 @@ If ($version) {
 	exit
 }
 
-exit
+
+
+
 $pageBack = 2
 
 If (! [string]::IsNullOrEmpty($vendor)) {
