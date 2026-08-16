@@ -1,12 +1,18 @@
 <#
 
-	# LAST CHANGED 2026/08/12
+	# LAST CHANGED 2026/08/14
+	
+	European Network and Information Security Agency
 	
 	powershell -ep bypass -f check-EUVD.ps1
+
+	powershell -ep bypass -f check-EUVD.ps1 -vendor "red hat"
 
 	powershell -ep bypass -f check-EUVD.ps1 -XALL
 	
 	powershell -ep bypass -f check-EUVD.ps1 -version
+	
+	
 	
 	
 	https://euvd.enisa.europa.eu/apidoc
@@ -14,6 +20,7 @@
 	https://github.com/bytew0lf/EUVD-API   !!!
 	
 	https://euvd.enisa.europa.eu/search?fromScore=8&toScore=10
+	https://euvd.enisa.europa.eu/search?fromScore=8&toScore=10&vendor=Hashicorp
 	
 	https://euvd.enisa.europa.eu/search?text=CVE-2026-20348
 	
@@ -24,14 +31,18 @@
 param (
 	[switch] $XALL,
 	[switch] $version,
-	[int] $daysBack = 4
+	[string] $vendor = $null,
+	[int] $daysBack  = 3,
+	[int] $fromScore = 7
 )
 
 
-$scriptVersion    = "v1.0 - 2026/08/12"
+$scriptVersion    = "v1.1 - 2026/08/16"
 $updateScriptURL  = "https://raw.githubusercontent.com/hirosec/powertools/refs/heads/main/scripts/check-EUVD.ps1"
 
 $api_URL          = "https://euvdservices.enisa.europa.eu/api/search?size=100&page=NNNN&fromScore=7.6&toScore=10&fromDate=yyyy-MM-dd"
+$api_URL_vendor   = "https://euvdservices.enisa.europa.eu/api/search?size=100&page=NNNN&fromScore=FROMSCORE&toScore=10&fromDate=yyyy-MM-dd&vendor=VENDOR"
+
 
 
 $vendorList = @(
@@ -43,6 +54,7 @@ $vendorList = @(
 		'redhat'
 		'IBM',
 		'Apache',
+		'Apache Software Foundation',
 		'Juniper',
 		'Bluecat',
 		'Splunk',
@@ -54,7 +66,9 @@ $vendorList = @(
 		'tenable',
 		'dell',
 		'Sonatype',
-		'Grafana'
+		'Grafana',
+		'Hashicorp',
+		'Elastic'		
 )
 	
 $pathArchive = "ENISA_Archive\"	
@@ -128,44 +142,59 @@ Write-Host "[+] Version   : $scriptVersion"
 	
 If ($version) {
 	Check-LatestScriptVersion
+	exit
 }
 
+
+$pageBack = 2
+
+If (! [string]::IsNullOrEmpty($vendor)) {
+	$vendorList = @()
+	$vendorList += $vendor
+	
+	$daysBack = 90
+	$pageBack = 5
+	
+	Write-Host "[+] Vendor    : $vendor" -ForeGroundColor yellow
+}
 
 
 $offsetDate = (Get-Date).AddDays(-$daysBack).ToString("yyyy-MM-dd")
 
 Write-Host "[+] Days back : $offsetDate (-$daysBack)"
-
 Write-Host "`n"
+
+
 
 $vulnInfo = @()
 
-for ($page = 0; $page -lt 10; $page++) {
-	# Update/Replace 'page' and from 'fromDate' 
-	$URL = $api_URL.Replace('NNNN', $page).Replace('yyyy-MM-dd', $offsetDate)
+foreach ($vendor in $vendorlist) {
+	Write-Host "[+] $vendor"
+			
+	for ($page = 0; $page -lt $pageBack; $page++) {
+		# Update/Replace 'page' and from 'fromDate' 
+		$URL = $api_URL_vendor.Replace('NNNN', $page).Replace('yyyy-MM-dd', $offsetDate).Replace('VENDOR', $vendor).Replace('FROMSCORE', $fromScore)
 	
-	# Write-Host "[+] API URL   : $URL"
+		# Write-Host "[+] API URL   : $URL"
 
-	try {
-		$data    = Invoke-WebRequest -Uri $URL -UseBasicParsing
-	} catch {
-            Write-host "[ERROR] $($_.Exception)" -ForeGroundColor Red
+
+		try {
+			$data    = Invoke-WebRequest -Uri $URL -UseBasicParsing
+		} catch {
+			Write-host "[ERROR] $($_.Exception)" -ForeGroundColor Red
             return $null
-	}
+		}
 	
-	$jsonObj =  $data.Content | ConvertFrom-Json
+		$jsonObj =  $data.Content | ConvertFrom-Json
 
 
-
-
-	$jsonObj.items | % {
-		$idCVE          = grep-CVE $_.aliases
-		$datePublished  = $(format-Date($_.datePublished))
-		$vendor        = $($_.enisaIdProduct[0].Product.Vendor.Name)
-		$product       = $($_.enisaIdProduct[0].Product.Name) -replace "^(.{45}).*$", '${1}'
-		$vulnDaysBack  = $(calc-Days  $_.datePublished)
+		$jsonObj.items | % {
+			$idCVE          = grep-CVE $_.aliases
+			$datePublished  = $(format-Date($_.datePublished))
+			$vendor        = $($_.enisaIdProduct[0].Product.Vendor.Name)
+			$product       = $($_.enisaIdProduct[0].Product.Name) -replace "^(.{45}).*$", '${1}'
+			$vulnDaysBack  = $(calc-Days  $_.datePublished)
 		
-		if ($vendorList -icontains $vendor -or $XALL) {
 			$vulnInfo += [PSCustomObject]@{
 				id             = $_.id 
 				vendor         = $vendor
@@ -176,8 +205,8 @@ for ($page = 0; $page -lt 10; $page++) {
 				page           = $page
 			}
 		}
-	}
-}	
+	}	
+}
 	
 $vulnInfo | Sort-Object -Property datePublished -Descending | FT datePublished, vendor, Product, CVE, baseScore, id, page -AutoSize
 
