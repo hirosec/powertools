@@ -1,0 +1,36 @@
+﻿Vendor,ENISA
+cisco,TRUE
+f5,TRUE
+Oracle Corporation,TRUE
+Microsoft,TRUE
+Red Hat,TRUE
+redhat,TRUE
+IBM,TRUE
+Apache,TRUE
+Apache Software Foundation,TRUE
+Juniper,TRUE
+Bluecat,TRUE
+Splunk,TRUE
+#Linux,FALSE
+VMware,TRUE
+Jenkins Project,TRUE
+HCLSoftware,TRUE
+#hackerone,FALSE
+tenable,TRUE
+dell,TRUE
+Sonatype,TRUE
+Grafana,TRUE
+Hashicorp,TRUE
+Elastic,TRUE
+Vertiv,TRUE
+Suse,TRUE
+Sonatype,TRUE
+Axway,TRUE
+Spring,TRUE
+Trellix,TRUE
+Broadcom,TRUE
+Veeam,TRUE
+Hitachi,TRUE
+Skyhigh Security,TRUE
+BitDefender,TRUE
+RSA,TRUE
