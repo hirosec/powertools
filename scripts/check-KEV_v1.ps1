@@ -61,12 +61,16 @@ param (
 
 
 $scriptVersion    = "v2.0 - 2026/09/27"
+$updateScriptURL  = "https://raw.githubusercontent.com/hirosec/powertools/refs/heads/main/scripts/check-KEV_v1.ps1"
+
+
 
 # URL KEV data in JSON format
 $url = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 
 # URL Monitored Vendor List
 $csvUrl_VendorList = "https://raw.githubusercontent.com/hirosec/powertools/refs/heads/main/lists/vendorlist.txt"
+
 
 
 
@@ -87,8 +91,29 @@ $global:vendorList = @()
 #########################################################################################################
 
 Function Check-LatestScriptVersion {
-	Write-Host "`n[+] Version : $scriptVersion "
+
+	try {
+		$WebResponse = (Invoke-WebRequest $updateScriptURL -UseBasicParsing -Headers @{"Cache-Control"="no-cache"}).Content
+		
+		$bytes = [System.Text.Encoding]::UTF8.GetBytes($WebResponse)
+		$hash = [System.Security.Cryptography.MD5]::Create().ComputeHash($bytes)
+		$md5 = [BitConverter]::ToString($hash) -replace '-', ''
+ 
+		foreach ($line in $WebResponse -split "`n") {
+
+			If ($line -like "*scriptVersion*") {
+				$tempStr = [regex]::matches($line,'(?<=\").+?(?=\")').value
+				Write-Host "[+] Latest    : $tempStr - $md5" -ForeGroundColor Yellow
+				return $null
+			}
+		}	 
+	} catch {
+            Write-host "[ERROR] $($_.Exception)" -ForeGroundColor Red
+            return $null
+	}	
 }
+
+
 
 
 # Display Monitored Vendor List
@@ -212,7 +237,11 @@ Function Download-KEVCatalog {
 ### MAIN
 	
 If ($version) {
+	$scriptName = $MyInvocation.MyCommand.Name
+	Write-Host "[+ Script     : $scriptName"
+	Write-Host "`n[+] Version   : $scriptVersion - $((Get-FileHash -Algorithm MD5 -Path $scriptName).Hash)"
 	Check-LatestScriptVersion
+	
 	exit
 }
 
