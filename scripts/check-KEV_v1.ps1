@@ -1,25 +1,29 @@
 <#
 
-	# LAST CHANGED 2026/09/27
+	# LAST CHANGED 2026/09/30
 	
 	
 	.DESCRIPTION
 		Monitoring newly added exploited vulnerabilities using KEV (Known Exploited Vulnerabilities) Catalog
 	
-	powershell -ep bypass -f check-KEV_v1.ps1
+	
+	.USAGE
+		powershell -ep bypass -f check-KEV_v1.ps1
 	
 	
-	powershell -ep bypass -f check-KEV_v1.ps1 -cve CVE-2026-20079 
+		powershell -ep bypass -f check-KEV_v1.ps1 -cve CVE-2026-20079 
 	
-	# Dump all alerts form all vendors for last 10 days
-	powershell -ep bypass -f check-KEV_v1.ps1 -latest
-	
-	
-	# Check version is up-to-date and compare to online script version
-	powershell -ep bypass -f check-KEV_v1.ps1 -version
 		
-	# Validate the Vendor list inline in the script with global online vendor list
-	powershell -ep bypass -f check-KEV_v1.ps1 -checkVendorList
+		# Dump all alerts form all vendors for last 10 days
+		powershell -ep bypass -f check-KEV_v1.ps1 -latest
+	
+	
+		# Check version is up-to-date and compare to online script version
+		powershell -ep bypass -f check-KEV_v1.ps1 -version
+		
+		
+		# Validate the Vendor list inline in the script with global online vendor list
+		powershell -ep bypass -f check-KEV_v1.ps1 -showVendorList
 	
 	
 	https://github.com/synfinner/KEVin
@@ -52,7 +56,7 @@ param (
 	[switch] $version,
 	[switch] $latest,
 	[string] $vendor = $null,
-	[switch] $checkVendorList,
+	[switch] $showVendorList,
 	[string] $cve_id = "CVE-2026-20079", 
 	[int] $latestCount = 20,
 	[int] $daysBack    = 90
@@ -60,7 +64,7 @@ param (
 )
 
 
-$scriptVersion    = "v2.0 - 2026/09/27"
+$scriptVersion    = "v2.0 - 2026/09/30"
 $updateScriptURL  = "https://raw.githubusercontent.com/hirosec/powertools/refs/heads/main/scripts/check-KEV_v1.ps1"
 
 
@@ -69,8 +73,10 @@ $updateScriptURL  = "https://raw.githubusercontent.com/hirosec/powertools/refs/h
 $url = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 
 # URL Monitored Vendor List
-$csvUrl_VendorList = "https://raw.githubusercontent.com/hirosec/powertools/refs/heads/main/lists/vendorlist.txt"
+$URL_VendorList = "https://raw.githubusercontent.com/hirosec/powertools/refs/heads/main/lists/vendorlist.txt"
 
+# Monitored Vendor list - Maintained Updated from Github 
+$global:vendorList = @()
 
 
 
@@ -80,12 +86,9 @@ $global:catalogKEV       = $null
 $global:catalogKEV_File  = $null
 
 # Path to Archive with KEV Commit History JSON files
-$global:pathArchive    = "KEV_Archive\"	
+$global:pathArchive     = "KEV_Archive\"	
 
-
-# Monitored Vendor list - Maintained Updated from Github 
-$global:vendorList = @()
-
+$pathArchive_VendorList = "VendorList\"
 	
 	
 #########################################################################################################
@@ -103,7 +106,7 @@ Function Check-LatestScriptVersion {
 
 			If ($line -like "*scriptVersion*") {
 				$tempStr = [regex]::matches($line,'(?<=\").+?(?=\")').value
-				Write-Host "[+] Latest    : $tempStr - $md5" -ForeGroundColor Yellow
+				Write-Host "[+] Latest    : $tempStr - MD5: $md5 - Size: $($($bytes.Length) | Convert-Size )" -ForeGroundColor Yellow
 				return $null
 			}
 		}	 
@@ -114,16 +117,40 @@ Function Check-LatestScriptVersion {
 }
 
 
+# Convert Number to Size format "11.2 KB (11,550 bytes)"
+
+Function Convert-Size {
+    [cmdletbinding()]
+    Param (
+        [parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [Alias("Length")]
+        [int64]$Size
+    )
+    Begin {
+        If (-Not $ConvertSize) {
+            $Signature =  @"
+                 [DllImport("Shlwapi.dll", CharSet = CharSet.Auto)]
+                 public static extern long StrFormatByteSize( long fileSize, System.Text.StringBuilder buffer, int bufferSize );
+"@
+            $Global:ConvertSize = Add-Type -Name SizeConverter -MemberDefinition $Signature -PassThru
+        }
+        $stringBuilder = New-Object Text.StringBuilder 1024
+    }
+    Process {
+        $ConvertSize::StrFormatByteSize( $Size, $stringBuilder, $stringBuilder.Capacity ) | Out-Null
+        $stringBuilder.ToString() + " ($($Size.ToString('N0')) bytes)"
+    }
+}
 
 
 # Display Monitored Vendor List
 
-Function Check-VendorList {
+Function Show-VendorList {
 	Write-Host "`n[+] Monitored Vendor List"  -ForeGroundColor Yellow
 	Write-Host "`------------------------------"
 	
 	try {	
-		$response = Invoke-WebRequest -Uri $csvUrl_VendorList -UseBasicParsing
+		$response = Invoke-WebRequest -Uri $URL_VendorList -UseBasicParsing
 	} catch {
 		Write-host "[ERROR] $($_.Exception)" -ForeGroundColor Red
         return $null
@@ -137,12 +164,27 @@ Function Check-VendorList {
 		}
 	 }
 	 
-	$global:vendorList | Sort-Object  | % {
+	# Remove Duplicates 
+	$global:vendorList = $global:vendorList | Sort-Object -Unique 
+	
+	
+	$global:vendorList | % {
 		"[$_]"
 	}
 	
 	Write-Host ""
-	Write-Host "[+] Total Count : $($global:vendorList.Length)"
+	Write-Host "[+] Total Count     : $($global:vendorList.Length)"
+	
+	
+	# Save Vendor List to Vendor List Archive Folder
+	if (-not(Test-Path $pathArchive_VendorList -PathType Container)) {
+		New-Item -path $pathArchive_VendorList -ItemType Directory
+	}
+	
+	$timestamp  = Get-Date -format 'yyyyMMddTHHmm'
+	$VendorList = "Monitored_Vendor_List_$($timestamp)_$($global:vendorList.Length).txt"
+	
+	$global:vendorList | Set-Content -Path $(Join-Path -Path $pathArchive_VendorList -ChildPath $VendorList  )
 }
 
 
@@ -150,7 +192,7 @@ Function Check-VendorList {
 
 Function Get-VendorList {
 	try {	
-		$response = Invoke-WebRequest -Uri $csvUrl_VendorList -UseBasicParsing
+		$response = Invoke-WebRequest -Uri $URL_VendorList -UseBasicParsing
 	} catch {
 		Write-host "[ERROR] $($_.Exception)" -ForeGroundColor Red
         return $null
@@ -164,7 +206,11 @@ Function Get-VendorList {
 			$global:vendorList += "$_"
 		}
 	}
+	
+	# Remove Duplicates 
+	$global:vendorList = $global:vendorList | Sort-Object -Unique 
 }
+
 
 
 # Find most recent KEV catalg file in Archive Folder
@@ -232,29 +278,29 @@ Function Download-KEVCatalog {
 }
 
 
-
+#########################################################################################################
 #########################################################################################################
 ### MAIN
 	
 If ($version) {
 	$scriptName = $MyInvocation.MyCommand.Name
-	Write-Host "[+ Script     : $scriptName"
-	Write-Host "`n[+] Version   : $scriptVersion - $((Get-FileHash -Algorithm MD5 -Path $scriptName).Hash)"
-	Check-LatestScriptVersion
+	$fileInfo = Get-Item $scriptName
 	
+	Write-Host "`n[+] Script     : $scriptName"
+	Write-Host "`n[+] Version   : $scriptVersion - MD5: $((Get-FileHash -Algorithm MD5 -Path $scriptName).Hash) - Size: $($($fileInfo.Length) | Convert-Size )"
+	Check-LatestScriptVersion
+		
 	exit
 }
 
 
-If ($checkVendorList) {
-	Check-VendorList
+If ($showVendorList) {
+	Show-VendorList
 	exit
 }
 
 
 $offsetDate = (Get-Date).AddDays(-$daysBack).ToString("yyyy-MM-dd")
-
-
 
 Write-Host "`n"
 Write-Host "------------------------------------------------------------------------------------------------------------------------"
@@ -265,6 +311,7 @@ Write-Host "[+] Version              : $scriptVersion - $((Get-FileHash $($MyInv
 Write-Host "[+] Days back            : $offsetDate (-$daysBack)"
 Write-Host ""
 
+# Update Vendor list from online Github repo
 Get-VendorList
 
 
@@ -332,8 +379,4 @@ $global:catalogKEV.vulnerabilities | % {
 }
 
 $vulnInfo | Sort-Object -Property dateAdded -Descending  | FT dateAdded, cveID, vendor, product, vulnerabilityName  -AutoSize 
-
-
-
-
 
