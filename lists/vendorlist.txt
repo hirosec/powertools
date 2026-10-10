@@ -27,7 +27,8 @@ Sonatype
 Splunk
 Spring
 Suse
-tenable
+Tenable, Inc.
+Tenable
 Trellix
 Veeam
 Vertiv
