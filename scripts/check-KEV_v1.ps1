@@ -1,6 +1,6 @@
 <#
 
-	# LAST CHANGED 2026/09/30
+	# LAST CHANGED 2026/10/10
 	
 	
 	.DESCRIPTION
@@ -59,12 +59,13 @@ param (
 	[switch] $showVendorList,
 	[string] $cve_id = "CVE-2026-20079", 
 	[int] $latestCount = 20,
-	[int] $daysBack    = 90
+	[int] $daysBack    = 30,
+	[int] $maxAge      = 20       # Offline file in minutes
 	
 )
 
 
-$scriptVersion    = "v2.0 - 2026/09/30"
+$scriptVersion    = "v2.0 - 2026/10/03"
 $updateScriptURL  = "https://raw.githubusercontent.com/hirosec/powertools/refs/heads/main/scripts/check-KEV_v1.ps1"
 
 
@@ -217,7 +218,7 @@ Function Get-VendorList {
 # If file is older then 60 minutes download new catalog file 
 
 Function Get-Offline-KEVCatalog {
-	$latestFile = Get-ChildItem -Path $global:pathArchive -Filter "*.json" -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+	$latestFile = Get-ChildItem -Path $global:pathArchive -Filter "KEV*.json" -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
 	If ($latestFile) {
 		$FileLastWriteTime = $latestFile.LastWriteTime
@@ -230,7 +231,7 @@ Function Get-Offline-KEVCatalog {
 		$FileAge     = $currentDate  - $FileLastWriteTime
 
 		[int] $FileAge_TotalMinutes = $FileAge.TotalMinutes
-		If ($FileAge_TotalMinutes -le 60) { 
+		If ($FileAge_TotalMinutes -le $maxAge) { 
 			$ageColor                = 'green' 
 			$global:catalogKEV_File  = $latestFile.Name
 		
@@ -240,7 +241,8 @@ Function Get-Offline-KEVCatalog {
 			$ageColor = 'red' 
 		} 
 
-		Write-Host "[+] KEV Catalog File Age : $($FileAge.Days) Days, $($FileAge.Hours) Hours, $($FileAge.Minutes) Minutes  [TotalMinutes : $FileAge_TotalMinutes]"  -ForeGroundColor $ageColor
+		Write-Host "[+] Found existing KEV file  : $($latestFile.Name)"
+		Write-Host "[+] KEV Catalog File Age     : $($FileAge.Days) Days, $($FileAge.Hours) Hours, $($FileAge.Minutes) Minutes  [TotalMinutes : $FileAge_TotalMinutes]"  -ForeGroundColor $ageColor
 	} 
 }
 
@@ -268,7 +270,7 @@ Function Download-KEVCatalog {
 	# Get Vulnerability count from  JSON file
 	$count    = $($global:catalogKEV.count)
 
-	$global:catalogKEV_File   = "KEVcatalog_$($CET_DATE)_$($count).json"
+	$global:catalogKEV_File   = "KEV_catalog_$($CET_DATE)_$($count).json"
 	
 	if (-not(Test-Path $pathArchive -PathType Container)) {
 		New-Item -path $pathArchive -ItemType Directory
@@ -306,9 +308,9 @@ Write-Host "`n"
 Write-Host "------------------------------------------------------------------------------------------------------------------------"
 Write-Host "CISA KEV (Known Exploited Vulnerabilities) Catalog".PadRight(120, ' ') -ForeGroundColor White -BackGroundColor Blue
 Write-Host ""
-Write-Host "[+] Date                 : $(Get-Date -format 'yyyy-MM-dd HH:mm')"
-Write-Host "[+] Version              : $scriptVersion - $((Get-FileHash $($MyInvocation.MyCommand.Name) -algo MD5).Hash)"	
-Write-Host "[+] Days back            : $offsetDate (-$daysBack)"
+Write-Host "[+] Date                     : $(Get-Date -format 'yyyy-MM-dd HH:mm')"
+Write-Host "[+] Version                  : $scriptVersion - $((Get-FileHash $($MyInvocation.MyCommand.Name) -algo MD5).Hash)"	
+Write-Host "[+] Days back                : $offsetDate (-$daysBack)"
 Write-Host ""
 
 # Update Vendor list from online Github repo
@@ -325,12 +327,12 @@ If (! $global:catalogKEV) {
 
 # Convert Catalog Time from UTC to CET
 $UTC_DATE   = $($global:catalogKEV.dateReleased)
-$CET_DATE   = Get-Date -Date $UTC_DATE  -format 'yyyyMMddTHHmm'
+$CET_DATE   = Get-Date -Date $UTC_DATE  -format 'yyyy-MM-dd HH:mm'
 
 
-Write-Host "[+] dateReleased         : $($global:catalogKEV.dateReleased) | $CET_DATE"
-Write-Host "[+] count                : $($global:catalogKEV.count)"	
-Write-Host "[+] KEV catalog filename : $($global:catalogKEV_File)"
+Write-Host "[+] dateReleased             : $($global:catalogKEV.dateReleased) | $CET_DATE (CET)"
+Write-Host "[+] count                    : $($global:catalogKEV.count)"	
+
 Write-Host "------------------------------------------------------------------------------------------------------------------------"
 
 
@@ -378,5 +380,5 @@ $global:catalogKEV.vulnerabilities | % {
 	}	
 }
 
-$vulnInfo | Sort-Object -Property dateAdded -Descending  | FT dateAdded, cveID, vendor, product, vulnerabilityName  -AutoSize 
+$vulnInfo | Sort-Object -Property dateAdded -Descending  | FT cveID, dateAdded, vendor, product, vulnerabilityName  -AutoSize 
 
