@@ -17,6 +17,7 @@ Hitachi
 IBM
 Jenkins Project
 Juniper
+Juniper Networks
 Microsoft
 Oracle Corporation
 Red Hat
