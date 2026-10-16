@@ -1,5 +1,5 @@
 <#
-	# LAST CHANGED 2026/10/09
+	# LAST CHANGED 2026/10/16
 	
 	
 	powershell -ep bypass -f check-EUVD_v2.ps1
@@ -56,6 +56,35 @@
 		$URL = "https://euvdservices.enisa.europa.eu/api/search?text=CVE-2026-2007"
 		$data = Invoke-RestMethod -Uri $URL
 		
+		
+	.UPDATE SCRIPT 
+		# Create backup of current file and download new binary
+		
+		$ARCHIVE_PATH    = "Script_Archive"
+		$Script_ORIGINAL = "check-EUVD_v2.ps1"
+		$Script_UPDATE   = "check-EUVD_v2_UPDATE_$(Get-Date -f 'yyyyMMdd').ps1"
+		$Script_BACKUP   = "check-EUVD_v2_BACKUP_$(Get-Date -f 'yyyyMMdd').ps1"
+		
+		$updateScriptURL = "https://raw.githubusercontent.com/hirosec/powertools/refs/heads/main/scripts/check-EUVD_v2.ps1"
+
+
+		# Check Online Version
+		$WebResponse = (Invoke-WebRequest $updateScriptURL -UseBasicParsing -Headers @{"Cache-Control"="no-cache"}).Content
+		foreach ($line in $WebResponse -split "`n") { If ($line -like "*scriptVersion*") { Write-Host "[+] $line"; break }}
+		
+		# Check Offline version
+		$data = GC $Script_ORIGINAL
+		foreach ($line in $data -split "`n") { If ($line -like "*scriptVersion*") { Write-Host "[+] $line"; break }}
+		
+		# Download Latest version from GitHub
+		## !!!! Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $Script_UPDATE   !!!!!
+		
+		
+		# Copy curent version to Archive Folder 
+		Copy-Item -Path $Script_ORIGINAL -Destination $(Join-Path -Path $ARCHIVE_PATH -ChildPath $Script_BACKUP)
+		
+		## !!!! Rename-Item -Path $Script_UPDATE -NewName $Script_ORIGINAL
+		
 #>
 
 param (
@@ -69,7 +98,7 @@ param (
 	[int] $maxAge    = 20       # Offline file in minutes
 )
 
-$scriptVersion					= "v2.1 - 2026/10/10"
+$scriptVersion					= "v2.2 - 2026/10/16"
 $updateScriptURL             	= "https://raw.githubusercontent.com/hirosec/powertools/refs/heads/main/scripts/check-EUVD_v2.ps1"
 
 $api_ENISA                  	= "https://euvdservices.enisa.europa.eu/api/search?size=100&page=PAGE&fromScore=FROMSCORE&fromDate=FROMDATE"
@@ -109,7 +138,6 @@ Function Check-LatestScriptVersion {
 		$md5 = [BitConverter]::ToString($hash) -replace '-', ''
  
 		foreach ($line in $WebResponse -split "`n") {
-
 			If ($line -like "*scriptVersion*") {
 				$tempStr = [regex]::matches($line,'(?<=\").+?(?=\")').value
 				Write-Host "[+] Latest    : $tempStr - MD5: $md5 - Size: $($($bytes.Length) | Convert-Size )" -ForeGroundColor Yellow
@@ -121,6 +149,44 @@ Function Check-LatestScriptVersion {
             return $null
 	}	
 }
+
+
+Function Launch-ScriptUpgrade {
+	# Create backup of current file and download new binary
+		
+	$ARCHIVE_PATH    = "Script_Archive"
+	$Script_ORIGINAL = "check-EUVD_v2.ps1"
+	$Script_UPDATE   = "check-EUVD_v2_UPDATE_$(Get-Date -f 'yyyyMMdd').ps1"
+	$Script_BACKUP   = "check-EUVD_v2_BACKUP_$(Get-Date -f 'yyyyMMdd').ps1"
+		
+	$updateScriptURL = "https://raw.githubusercontent.com/hirosec/powertools/refs/heads/main/scripts/check-EUVD_v2.ps1"
+
+
+
+		
+	# Check Offline version
+	Write-Host "`n[+] Current Offline Version" -ForeGroundColor Yellow
+	$data = GC $Script_ORIGINAL
+
+	foreach ($line in $data -split "`n") { If ($line.StartsWith('$scriptVersion')) { Write-Host "[+] $line"; break }}
+	
+	
+	# Check Online Version
+	Write-Host "`n[+] GitHub Online Version" -ForeGroundColor Yellow
+	$WebResponse = (Invoke-WebRequest $updateScriptURL -UseBasicParsing -Headers @{"Cache-Control"="no-cache"}).Content
+	foreach ($line in $WebResponse -split "`n") { If ($line.StartsWith('$scriptVersion')) { Write-Host "[+] $line"; break }}
+		
+	# Download Latest version from GitHub
+	## !!!! Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $Script_UPDATE   !!!!!
+		
+		
+	# Copy curent version to Archive Folder 
+	Copy-Item -Path $Script_ORIGINAL -Destination $(Join-Path -Path $ARCHIVE_PATH -ChildPath $Script_BACKUP)
+		
+	## !!!! Rename-Item -Path $Script_UPDATE -NewName $Script_ORIGINAL	
+}
+
+
 
 
 # Convert Number to Size format "11.2 KB (11,550 bytes)"
@@ -298,7 +364,17 @@ Function format-Date {
 		[string] $dateTemplate   = "MMM d, yyyy, h:mm:ss tt"    # "May 28, 2026, 4:17:21 PM"
 	)	
 	
-	[datetime]::ParseExact($dateStr, $dateTemplate, $null).ToString('yyyy.MM.dd HH:mm:ss')
+	
+	#  ERROR ParseDate ! 'Sep' !!  'Sept' wrong format AbbreviatedMonthNames 
+	$Culture = [System.Globalization.CultureInfo]::CreateSpecificCulture('en-US')
+	
+	try	{
+		# [datetime]::ParseExact($dateStr, $dateTemplate, $null).ToString('yyyy.MM.dd HH:mm:ss')
+		[datetime]::ParseExact($dateStr, $dateTemplate, $Culture).ToString('yyyy.MM.dd HH:mm:ss')
+	} catch {
+		Write-Warning "$dateStr | FAIL - Parse Date !" 
+		return '2026.10.15 01:02:03'
+	}
 }
 
 
@@ -373,6 +449,12 @@ Function Get-Latest-Offline-ENISA-JSON {
 
 
 Write-Host ""
+
+Launch-ScriptUpgrade
+
+exit
+
+
 	
 If ($version) {
 	$scriptName = $MyInvocation.MyCommand.Name
@@ -445,6 +527,8 @@ do {
 		# Update/Replace 'page', 'fromDate' and 'fromScore' 
 		$URL = $api_ENISA.Replace('PAGE', $page).Replace('FROMDATE', $from_date).Replace('FROMSCORE', $fromScore)
 		# Write-Host "[+] API URL   : $URL"
+		
+
 
 		try {
 			$response  = Invoke-WebRequest -Uri $URL -UseBasicParsing
@@ -475,12 +559,16 @@ do {
 
 
 	$data | % {
+			## $_ | FL *
+			
+	
+		
 			$idCVE          = grep-CVE $_.aliases
 			$datePublished  = $(format-Date($_.datePublished))
 			$vendor         = $($_.enisaIdProduct[0].Product.Vendor.Name)
 			$productName    = $($_.enisaIdProduct[0].Product.Name) -replace "^(.{60}).*$", '${1}'
 			$productVersion = $($_.enisaIdProduct[0].Product_version)  -replace "^(.{50}).*$", '${1}'
-			$vulnDaysBack  	= $(calc-Days  $_.datePublished)
+			# $vulnDaysBack  	= $(calc-Days  $_.datePublished)
 			$inScope 		= $(($global:vendorList -contains $vendor))
 			
 			# Verify if Vendor:Product is in exclusion list
@@ -505,7 +593,7 @@ do {
 				CVE_baseScore  = $($cveMetadata.baseScore)
 			}
 	}
-		
+	
 	$page++
 } while ($recordsCount -eq 100)
 
